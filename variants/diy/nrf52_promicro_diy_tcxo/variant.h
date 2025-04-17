@@ -22,26 +22,26 @@ extern "C" {
 /*
 NRF52 PRO MICRO PIN ASSIGNMENT
 
-| Pin   | Function    |     | Pin      | Function     | RF95  |
+| Pin ï¿½ | Function ï¿½  | ï¿½   | Pin ï¿½ ï¿½  | Function ï¿½ ï¿½ | RF95  |
 | ----- | ----------- | --- | -------- | ------------ | ----- |
-| Gnd   |             |     | vbat     |              |       |
-| P0.06 | Serial2 RX  |     | vbat     |              |       |
-| P0.08 | Serial2 TX  |     | Gnd      |              |       |
-| Gnd   |             |     | reset    |              |       |
-| Gnd   |             |     | ext_vcc  | *see 0.13    |       |
-| P0.17 | RXEN        |     | P0.31    | BATTERY_PIN  |       |
-| P0.20 | GPS_RX      |     | P0.29    | BUSY         | DIO0  |
-| P0.22 | GPS_TX      |     | P0.02    | MISO         | MISO  |
-| P0.24 | GPS_EN      |     | P1.15    | MOSI         | MOSI  |
-| P1.00 | BUTTON_PIN  |     | P1.13    | CS           | CS    |
-| P0.11 | SCL         |     | P1.11    | SCK          | SCK   |
-| P1.04 | SDA         |     | P0.10    | DIO1/IRQ     | DIO1  |
-| P1.06 | Free pin    |     | P0.09    | RESET        | RST   |
-|       |             |     |          |              |       |
-|       | Mid board   |     |          | Internal     |       |
-| P1.01 | Free pin    |     | 0.15     | LED          |       |
-| P1.02 | Free pin    |     | 0.13     | 3V3_EN       |       |
-| P1.07 | Free pin    |     |          |              |       |
+| Gnd ï¿½ | ï¿½ ï¿½ ï¿½ ï¿½ ï¿½ ï¿½ | ï¿½   | vbat ï¿½ ï¿½ | ï¿½ ï¿½ ï¿½ ï¿½ ï¿½ ï¿½  |       |
+| P0.06 | Serial2 RX  | ï¿½   | vbat ï¿½ ï¿½ | ï¿½ ï¿½ ï¿½ ï¿½ ï¿½ ï¿½  |       |
+| P0.08 | Serial2 TX  | ï¿½   | Gnd ï¿½ ï¿½  | ï¿½ ï¿½ ï¿½ ï¿½ ï¿½ ï¿½  |       |
+| Gnd ï¿½ | ï¿½ ï¿½ ï¿½ ï¿½ ï¿½ ï¿½ | ï¿½   | reset ï¿½  | ï¿½ ï¿½ ï¿½ ï¿½ ï¿½ ï¿½  |       |
+| Gnd ï¿½ | ï¿½ ï¿½ ï¿½ ï¿½ ï¿½ ï¿½ | ï¿½   | ext_vcc  | *see 0.13 ï¿½  |       |
+| P0.17 | RXEN ï¿½ ï¿½ ï¿½  | ï¿½   | P0.31 ï¿½  | BATTERY_PIN  |       |
+| P0.20 | GPS_RX ï¿½ ï¿½  | ï¿½   | P0.29 ï¿½  | BUSY ï¿½ ï¿½ ï¿½ ï¿½ | DIO0  |
+| P0.22 | GPS_TX ï¿½ ï¿½  | ï¿½   | P0.02 ï¿½  | MISO         | MISO  |
+| P0.24 | GPS_EN ï¿½ ï¿½  | ï¿½   | P1.15 ï¿½  | MOSI ï¿½ ï¿½ ï¿½ ï¿½ | MOSI  |
+| P1.00 | BUTTON_PIN  | ï¿½   | P1.13 ï¿½  | CS ï¿½ ï¿½ ï¿½ ï¿½ ï¿½ | CS ï¿½  |
+| P0.11 | SCL ï¿½ ï¿½ ï¿½ ï¿½ | ï¿½   | P1.11 ï¿½  | SCK ï¿½ ï¿½ ï¿½ ï¿½  | SCK   |
+| P1.04 | SDA ï¿½ ï¿½ ï¿½ ï¿½ | ï¿½   | P0.10 ï¿½  | DIO1/IRQ ï¿½ ï¿½ | DIO1  |
+| P1.06 | Free pin ï¿½  | ï¿½   | P0.09 ï¿½  | RESET ï¿½ ï¿½ ï¿½  | RST   |
+| ï¿½ ï¿½ ï¿½ | ï¿½ ï¿½ ï¿½ ï¿½ ï¿½ ï¿½ | ï¿½   | ï¿½ ï¿½ ï¿½ ï¿½  | ï¿½ ï¿½ ï¿½ ï¿½ ï¿½ ï¿½  |       |
+| ï¿½ ï¿½ ï¿½ | Mid board ï¿½ | ï¿½   | ï¿½ ï¿½ ï¿½ ï¿½  | Internal ï¿½ ï¿½ |       |
+| P1.01 | Free pin ï¿½  | ï¿½   | 0.15 ï¿½ ï¿½ | LED ï¿½ ï¿½ ï¿½ ï¿½  |       |
+| P1.02 | Free pin ï¿½  | ï¿½   | 0.13 ï¿½ ï¿½ | 3V3_EN ï¿½ ï¿½ ï¿½ |       |
+| P1.07 | Free pin ï¿½  | ï¿½   | ï¿½ ï¿½ ï¿½ ï¿½  | ï¿½ ï¿½ ï¿½ ï¿½ ï¿½ ï¿½  |       |
 */
 
 // Number of pins defined in PinDescription array
@@ -157,7 +157,17 @@ NRF52 PRO MICRO PIN ASSIGNMENT
 #define LR11X0_DIO_AS_RF_SWITCH
 #endif
 
-// #define SX126X_MAX_POWER 8 set this if using a high-power board!
+// Specific power settings for the E22-900M33S module - US version - 33dBm
+#ifdef EBYTE_E22_900M33S_US
+#define REGULATORY_GAIN_LORA 25
+#define SX126X_MAX_POWER 8
+#endif
+
+// Specific power settings for the E22-900M33S module - EU version - 27dBm
+#ifdef EBYTE_E22_900M33S_EU
+#define REGULATORY_GAIN_LORA 25
+#define SX126X_MAX_POWER 2
+#endif
 
 /*
 On the SX1262, DIO3 sets the voltage for an external TCXO, if one is present. If one is not present, use TCXO_OPTIONAL to try both
