@@ -1,0 +1,148 @@
+name: Sync with Upstream
+
+on:
+  schedule:
+    # Run daily at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    # Allow manual triggering
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    # Only run on the fork, not on the upstream repository
+    if: github.repository == 'a-li3n/firmware'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: master
+          fetch-depth: 0  # Fetch all history for proper merging
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Add Upstream Remote
+        run: |
+          git remote add upstream https://github.com/Meshtastic/firmware.git || true
+          git remote -v
+      
+      - name: Fetch Upstream
+        run: |
+          echo "Fetching latest changes from upstream repository..."
+          git fetch upstream master
+      
+      - name: Check for Merge Conflicts
+        id: check_conflicts
+        run: |
+          echo "Checking if merge will have conflicts..."
+          # Try a test merge to see if there are conflicts
+          if git merge --no-commit --no-ff upstream/master > /dev/null 2>&1; then
+            echo "has_conflicts=false" >> $GITHUB_OUTPUT
+            git merge --abort 2>/dev/null || true
+          else
+            echo "has_conflicts=true" >> $GITHUB_OUTPUT
+            git merge --abort 2>/dev/null || true
+          fi
+      
+      - name: Merge Upstream Changes
+        if: steps.check_conflicts.outputs.has_conflicts == 'false'
+        run: |
+          echo "Merging upstream/master into master..."
+          git merge upstream/master --no-edit
+      
+      - name: Push Changes
+        if: steps.check_conflicts.outputs.has_conflicts == 'false'
+        run: |
+          echo "Pushing updated master branch to origin..."
+          git push origin master
+      
+      - name: Create Issue on Merge Conflict
+        if: steps.check_conflicts.outputs.has_conflicts == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '🚨 Merge Conflict Detected in Upstream Sync';
+            const body = `## Merge Conflict Detected
+            
+            The automated upstream sync workflow has detected merge conflicts when trying to merge changes from the upstream repository (\`Meshtastic/firmware\`).
+            
+            ### Action Required
+            
+            Manual intervention is needed to resolve these conflicts. Please follow these steps:
+            
+            1. **Clone the repository locally:**
+               \`\`\`bash
+               git clone https://github.com/a-li3n/firmware.git
+               cd firmware
+               git checkout master
+               \`\`\`
+            
+            2. **Add the upstream remote:**
+               \`\`\`bash
+               git remote add upstream https://github.com/Meshtastic/firmware.git
+               git fetch upstream
+               \`\`\`
+            
+            3. **Attempt to merge and resolve conflicts:**
+               \`\`\`bash
+               git merge upstream/master
+               \`\`\`
+            
+            4. **Resolve conflicts in the affected files:**
+               - Open files with conflict markers
+               - Edit to resolve conflicts
+               - Save the files
+            
+            5. **Complete the merge:**
+               \`\`\`bash
+               git add .
+               git commit -m "Merge upstream changes and resolve conflicts"
+               git push origin master
+               \`\`\`
+            
+            ### Workflow Run
+            
+            - **Run ID:** ${{ github.run_id }}
+            - **Run Number:** ${{ github.run_number }}
+            - **Triggered:** ${{ github.event_name }}
+            
+            Once conflicts are resolved and changes are pushed, this issue can be closed.`;
+            
+            // Check if an issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'upstream-sync-conflict'
+            });
+            
+            if (issues.data.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['upstream-sync-conflict', 'automation']
+              });
+              console.log('Created new issue for merge conflict');
+            } else {
+              console.log('Issue for merge conflict already exists');
+            }
+      
+      - name: Summary
+        if: always()
+        run: |
+          if [ "${{ steps.check_conflicts.outputs.has_conflicts }}" == "true" ]; then
+            echo "⚠️ Merge conflicts detected. Manual intervention required." >> $GITHUB_STEP_SUMMARY
+            echo "An issue has been created to track this conflict." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ Successfully synced with upstream repository." >> $GITHUB_STEP_SUMMARY
+          fi
