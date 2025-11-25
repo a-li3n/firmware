@@ -68,6 +68,10 @@
 #define HW_VENDOR meshtastic_HardwareModel_T_ECHO_LITE
 #elif defined(ELECROW_ThinkNode_M1)
 #define HW_VENDOR meshtastic_HardwareModel_THINKNODE_M1
+#elif defined(ELECROW_ThinkNode_M3)
+#define HW_VENDOR meshtastic_HardwareModel_THINKNODE_M3
+#elif defined(ELECROW_ThinkNode_M6)
+#define HW_VENDOR meshtastic_HardwareModel_THINKNODE_M6
 #elif defined(NANO_G2_ULTRA)
 #define HW_VENDOR meshtastic_HardwareModel_NANO_G2_ULTRA
 #elif defined(CANARYONE)
@@ -128,7 +132,9 @@
 
 #endif
 
+#ifdef PIN_LED1
 #define LED_PIN PIN_LED1 // LED1 on nrf52840-DK
+#endif
 
 #ifdef PIN_BUTTON1
 #define BUTTON_PIN PIN_BUTTON1
