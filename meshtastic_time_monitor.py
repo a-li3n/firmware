@@ -5,10 +5,14 @@ Meshtastic Time Monitor
 This script monitors serial/TCP output from a Meshtastic node and tracks which remote nodes
 are sending time information to the mesh, identifying nodes with incorrect time.
 
+REQUIREMENTS:
+    - Your Meshtastic node must have DEBUG logging enabled
+    - The script parses Router POSITION debug logs to extract time information
+
 Usage:
     # Serial connection
     python3 meshtastic_time_monitor.py /dev/ttyUSB0
-    python3 meshtastic_time_monitor.py /dev/ttyUSB0 --threshold 60 --json
+    python3 meshtastic_time_monitor.py /dev/ttyUSB0 --threshold 60 --debug
 
     # TCP connection (for embedded meshtasticd nodes)
     python3 meshtastic_time_monitor.py --tcp localhost
@@ -17,6 +21,21 @@ Usage:
     # With alerting
     python3 meshtastic_time_monitor.py /dev/ttyUSB0 --alert --alert-channel 0
     python3 meshtastic_time_monitor.py --tcp localhost --alert --alert-cooldown 3600
+
+    # Debug mode (shows all lines and parsing)
+    python3 meshtastic_time_monitor.py /dev/ttyUSB0 --debug
+
+    # Logging to file (also shows on console)
+    python3 meshtastic_time_monitor.py /dev/ttyUSB0 --log-file /var/log/meshtastic_time.log
+
+    # Log to file only (no console output, good for background operation)
+    python3 meshtastic_time_monitor.py /dev/ttyUSB0 --log-file /var/log/meshtastic_time.log --log-only
+
+    # Append to existing log file
+    python3 meshtastic_time_monitor.py /dev/ttyUSB0 --log-file /var/log/meshtastic_time.log --log-append
+
+Expected log format from Meshtastic device:
+    DEBUG | HH:MM:SS microsec [Router] POSITION node=hexid ... time=timestamp
 """
 
 import serial
@@ -26,6 +45,7 @@ import json
 import time
 import argparse
 import sys
+import logging
 from datetime import datetime, timezone
 from collections import defaultdict
 from typing import Dict, Optional, Tuple, Set
@@ -315,6 +335,11 @@ class MeshtasticMonitor:
         self.position_pattern = re.compile(
             r'Position packet: time=(\d+) lat=(-?\d+) lon=(-?\d+)'
         )
+        # New pattern for Router POSITION logs
+        # Format: DEBUG | HH:MM:SS microsec [Router] POSITION node=hexid ... time=timestamp
+        self.router_position_pattern = re.compile(
+            r'\[Router\]\s+POSITION\s+node=([0-9a-fA-F]+).*?time=(\d+)'
+        )
 
     def connect(self):
         """Connect to the device."""
@@ -363,6 +388,20 @@ class MeshtasticMonitor:
             'time': int(match.group(1)),
             'lat': int(match.group(2)),
             'lon': int(match.group(3))
+        }
+
+    def parse_router_position_log(self, line: str) -> Optional[Dict]:
+        """Parse Router POSITION debug log.
+
+        Format: DEBUG | HH:MM:SS microsec [Router] POSITION node=ab09c8a5 ... time=1763823501
+        """
+        match = self.router_position_pattern.search(line)
+        if not match:
+            return None
+
+        return {
+            'node': match.group(1),
+            'time': int(match.group(2))
         }
 
     def parse_json_packet(self, line: str) -> Optional[Dict]:
@@ -430,8 +469,69 @@ def format_time_diff(seconds: int) -> str:
         return f"{days}d {hours}h"
 
 
+def setup_logging(log_file: Optional[str] = None, log_only: bool = False,
+                  log_append: bool = False, debug: bool = False):
+    """
+    Setup logging configuration.
+
+    Args:
+        log_file: Path to log file (None for console only)
+        log_only: If True, only log to file (no console output)
+        log_append: If True, append to existing log file
+        debug: If True, set log level to DEBUG
+
+    Returns:
+        Logger instance
+    """
+    logger = logging.getLogger('meshtastic_monitor')
+    logger.setLevel(logging.DEBUG if debug else logging.INFO)
+
+    # Remove any existing handlers
+    logger.handlers = []
+
+    # Create formatter
+    formatter = logging.Formatter('%(asctime)s | %(message)s',
+                                 datefmt='%Y-%m-%d %H:%M:%S')
+
+    # Add file handler if log file specified
+    if log_file:
+        mode = 'a' if log_append else 'w'
+        file_handler = logging.FileHandler(log_file, mode=mode)
+        file_handler.setLevel(logging.DEBUG if debug else logging.INFO)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
+    # Add console handler unless log_only is specified
+    if not log_only:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.DEBUG if debug else logging.INFO)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+
+    return logger
+
+
+def log_message(logger, message: str, level: str = 'info'):
+    """
+    Log a message at the specified level.
+
+    Args:
+        logger: Logger instance
+        message: Message to log
+        level: Log level (debug, info, warning, error)
+    """
+    if level == 'debug':
+        logger.debug(message)
+    elif level == 'warning':
+        logger.warning(message)
+    elif level == 'error':
+        logger.error(message)
+    else:
+        logger.info(message)
+
+
 def send_bad_time_alert(monitor: MeshtasticMonitor, node_id: str, time_diff: int,
-                        channel: int, message_format: str) -> bool:
+                        channel: int, message_format: str, logger=None) -> bool:
     """
     Send an alert to the mesh about a node with bad time.
 
@@ -441,6 +541,7 @@ def send_bad_time_alert(monitor: MeshtasticMonitor, node_id: str, time_diff: int
         time_diff: Time difference in seconds
         channel: Channel to send alert to
         message_format: Format string for message
+        logger: Optional logger instance
 
     Returns:
         True if message sent successfully
@@ -453,10 +554,16 @@ def send_bad_time_alert(monitor: MeshtasticMonitor, node_id: str, time_diff: int
             time_diff_seconds=time_diff
         )
 
-        print(f"[!] Sending alert to channel {channel}: {message}")
+        if logger:
+            log_message(logger, f"[!] Sending alert to channel {channel}: {message}")
+        else:
+            print(f"[!] Sending alert to channel {channel}: {message}")
         return monitor.send_alert(message, channel)
     except Exception as e:
-        print(f"[-] Failed to send alert: {e}")
+        if logger:
+            log_message(logger, f"[-] Failed to send alert: {e}", 'error')
+        else:
+            print(f"[-] Failed to send alert: {e}")
         return False
 
 
@@ -480,6 +587,16 @@ def main():
                        help='Parse JSON formatted logs (for ENABLE_JSON_LOGGING builds)')
     parser.add_argument('--stats-interval', type=int, default=60,
                        help='Interval to print statistics in seconds (default: 60)')
+    parser.add_argument('--debug', action='store_true',
+                       help='Show all raw lines received (for debugging pattern matching)')
+
+    # Logging options
+    parser.add_argument('--log-file', type=str,
+                       help='Log output to file (in addition to console)')
+    parser.add_argument('--log-only', action='store_true',
+                       help='Only log to file, suppress console output (requires --log-file)')
+    parser.add_argument('--log-append', action='store_true',
+                       help='Append to existing log file instead of overwriting')
 
     # Alert options
     parser.add_argument('--alert', action='store_true',
@@ -496,10 +613,23 @@ def main():
 
     args = parser.parse_args()
 
+    # Validate arguments
+    if args.log_only and not args.log_file:
+        print("[-] Error: --log-only requires --log-file")
+        sys.exit(1)
+
+    # Setup logging
+    logger = setup_logging(
+        log_file=args.log_file,
+        log_only=args.log_only,
+        log_append=args.log_append,
+        debug=args.debug
+    )
+
     # Check for meshtastic library if alerts enabled
     if args.alert and not MESHTASTIC_AVAILABLE:
-        print("[-] Error: --alert requires 'meshtastic' library")
-        print("    Install with: pip3 install meshtastic")
+        log_message(logger, "[-] Error: --alert requires 'meshtastic' library", 'error')
+        log_message(logger, "    Install with: pip3 install meshtastic", 'error')
         sys.exit(1)
 
     # Create connection
@@ -519,11 +649,13 @@ def main():
     if not monitor.connect():
         sys.exit(1)
 
-    print(f"[+] Monitoring for time synchronization issues (threshold: {args.threshold}s)")
+    log_message(logger, f"[+] Monitoring for time synchronization issues (threshold: {args.threshold}s)")
     if args.alert:
-        print(f"[+] Alerts enabled on channel {args.alert_channel} "
-              f"(cooldown: {args.alert_cooldown}s)" if not args.alert_once else "(one-time only)")
-    print(f"[+] Press Ctrl+C to stop and show statistics\n")
+        cooldown_msg = f"(cooldown: {args.alert_cooldown}s)" if not args.alert_once else "(one-time only)"
+        log_message(logger, f"[+] Alerts enabled on channel {args.alert_channel} {cooldown_msg}")
+    if args.log_file:
+        log_message(logger, f"[+] Logging to file: {args.log_file}")
+    log_message(logger, f"[+] Press Ctrl+C to stop and show statistics")
 
     last_stats_time = time.time()
 
@@ -533,6 +665,10 @@ def main():
             if not line:
                 continue
 
+            # Debug output: show all lines
+            if args.debug:
+                log_message(logger, f"[DEBUG] {line}", 'debug')
+
             # Try parsing as JSON if enabled
             if args.json:
                 packet = monitor.parse_json_packet(line)
@@ -540,38 +676,84 @@ def main():
                     from_node = f"0x{packet['from']}"
                     position_time = packet['position_time']
 
+                    if args.debug:
+                        log_message(logger, f"[DEBUG] Parsed position from JSON: node={from_node}, time={position_time}", 'debug')
+
                     is_incorrect, time_diff = tracker.update_node_time(from_node, position_time)
 
-                    status = "❌ INCORRECT" if is_incorrect else "✓ OK"
-                    print(f"{status} Node {from_node}: "
-                          f"Reported: {format_timestamp(position_time)}, "
-                          f"Diff: {format_time_diff(time_diff)}")
-
                     if is_incorrect:
-                        print(f"  └─ WARNING: Time difference exceeds threshold!")
+                        status = "❌ INCORRECT"
+                        log_message(logger, f"{status} Node {from_node}: "
+                              f"Reported: {format_timestamp(position_time)}, "
+                              f"Diff: {format_time_diff(time_diff)}", 'warning')
+                        log_message(logger, f"  └─ WARNING: Time difference exceeds threshold!", 'warning')
+                    else:
+                        status = "✓ GOOD TIME"
+                        log_message(logger, f"{status} Node {from_node}: "
+                              f"Reported: {format_timestamp(position_time)}, "
+                              f"Diff: {format_time_diff(time_diff)}")
+                        log_message(logger, f"  └─ Time is synchronized (within {args.threshold}s threshold)")
 
                         # Send alert if enabled
                         if args.alert:
                             should_alert = tracker.should_alert(from_node, args.alert_cooldown if not args.alert_once else float('inf'))
                             if should_alert:
                                 if send_bad_time_alert(monitor, from_node, time_diff,
-                                                      args.alert_channel, args.alert_message):
+                                                      args.alert_channel, args.alert_message, logger):
                                     tracker.mark_alerted(from_node)
-                                    print(f"  └─ Alert sent to channel {args.alert_channel}")
+                                    log_message(logger, f"  └─ Alert sent to channel {args.alert_channel}")
 
             # Try parsing text format
             else:
-                # Look for Position packet logs
+                # First try the Router POSITION log format (most common with debug enabled)
+                router_position = monitor.parse_router_position_log(line)
+                if router_position:
+                    node_id = f"0x{router_position['node']}"
+                    position_time = router_position['time']
+
+                    if args.debug:
+                        log_message(logger, f"[DEBUG] Parsed Router POSITION: node={node_id}, time={position_time}", 'debug')
+
+                    is_incorrect, time_diff = tracker.update_node_time(node_id, position_time)
+
+                    if is_incorrect:
+                        status = "❌ INCORRECT"
+                        log_message(logger, f"{status} Node {node_id}: "
+                              f"Reported: {format_timestamp(position_time)}, "
+                              f"Diff: {format_time_diff(time_diff)}", 'warning')
+                        log_message(logger, f"  └─ WARNING: Time difference exceeds threshold!", 'warning')
+
+                        # Send alert if enabled
+                        if args.alert:
+                            should_alert = tracker.should_alert(node_id, args.alert_cooldown if not args.alert_once else float('inf'))
+                            if should_alert:
+                                if send_bad_time_alert(monitor, node_id, time_diff,
+                                                      args.alert_channel, args.alert_message, logger):
+                                    tracker.mark_alerted(node_id)
+                                    log_message(logger, f"  └─ Alert sent to channel {args.alert_channel}")
+                    else:
+                        status = "✓ GOOD TIME"
+                        log_message(logger, f"{status} Node {node_id}: "
+                              f"Reported: {format_timestamp(position_time)}, "
+                              f"Diff: {format_time_diff(time_diff)}")
+                        log_message(logger, f"  └─ Time is synchronized (within {args.threshold}s threshold)")
+
+                    continue  # Don't process other patterns if we found a Router POSITION log
+
+                # Look for Position packet logs (legacy format)
                 position = monitor.parse_position_log(line)
                 if position:
                     # Position logs don't include sender ID in this format
                     # We need to correlate with packet logs
                     # For now, just note that a position with time was seen
-                    print(f"[INFO] Position update: time={format_timestamp(position['time'])}")
+                    log_message(logger, f"[INFO] Position update: time={format_timestamp(position['time'])}")
 
                 # Parse general packet info
                 packet = monitor.parse_text_packet(line)
                 if packet:
+                    if args.debug:
+                        log_message(logger, f"[DEBUG] Parsed packet: from={packet['from']}, portnum={packet['portnum']}", 'debug')
+
                     # Check if this is a POSITION_APP packet (portnum=3)
                     if packet['portnum'] == 3 and packet['rx_time']:
                         from_node = f"0x{packet['from']}"
@@ -579,63 +761,73 @@ def main():
                         # Check subsequent lines for Position packet log
                         next_line = monitor.read_line()
                         if next_line:
+                            if args.debug:
+                                log_message(logger, f"[DEBUG] Next line: {next_line}", 'debug')
+
                             position = monitor.parse_position_log(next_line)
                             if position:
+                                if args.debug:
+                                    log_message(logger, f"[DEBUG] Parsed position: time={position['time']}", 'debug')
                                 is_incorrect, time_diff = tracker.update_node_time(
                                     from_node,
                                     position['time']
                                 )
 
-                                status = "❌ INCORRECT" if is_incorrect else "✓ OK"
-                                print(f"{status} Node {from_node}: "
-                                      f"Reported: {format_timestamp(position['time'])}, "
-                                      f"Diff: {format_time_diff(time_diff)}")
-
                                 if is_incorrect:
-                                    print(f"  └─ WARNING: Time difference exceeds threshold!")
+                                    status = "❌ INCORRECT"
+                                    log_message(logger, f"{status} Node {from_node}: "
+                                          f"Reported: {format_timestamp(position['time'])}, "
+                                          f"Diff: {format_time_diff(time_diff)}", 'warning')
+                                    log_message(logger, f"  └─ WARNING: Time difference exceeds threshold!", 'warning')
+                                else:
+                                    status = "✓ GOOD TIME"
+                                    log_message(logger, f"{status} Node {from_node}: "
+                                          f"Reported: {format_timestamp(position['time'])}, "
+                                          f"Diff: {format_time_diff(time_diff)}")
+                                    log_message(logger, f"  └─ Time is synchronized (within {args.threshold}s threshold)")
 
                                     # Send alert if enabled
                                     if args.alert:
                                         should_alert = tracker.should_alert(from_node, args.alert_cooldown if not args.alert_once else float('inf'))
                                         if should_alert:
                                             if send_bad_time_alert(monitor, from_node, time_diff,
-                                                                  args.alert_channel, args.alert_message):
+                                                                  args.alert_channel, args.alert_message, logger):
                                                 tracker.mark_alerted(from_node)
-                                                print(f"  └─ Alert sent to channel {args.alert_channel}")
+                                                log_message(logger, f"  └─ Alert sent to channel {args.alert_channel}")
 
             # Print periodic statistics
             current_time = time.time()
             if current_time - last_stats_time >= args.stats_interval:
-                print("\n" + "="*70)
-                print("STATISTICS SUMMARY")
-                print("="*70)
+                log_message(logger, "\n" + "="*70)
+                log_message(logger, "STATISTICS SUMMARY")
+                log_message(logger, "="*70)
                 stats = tracker.get_statistics()
 
                 if not stats:
-                    print("No nodes tracked yet.")
+                    log_message(logger, "No nodes tracked yet.")
                 else:
                     for node_id, node_stats in sorted(stats.items()):
-                        print(f"\nNode: {node_stats['name']}")
-                        print(f"  Samples: {node_stats['sample_count']}")
-                        print(f"  Average time diff: {format_time_diff(int(node_stats['avg_diff']))}")
-                        print(f"  Max time diff: {format_time_diff(int(node_stats['max_diff']))}")
-                        print(f"  Last seen: {format_timestamp(node_stats['last_seen'])}")
-                        print(f"  Last reported time: {format_timestamp(node_stats['last_reported_time'])}")
+                        log_message(logger, f"\nNode: {node_stats['name']}")
+                        log_message(logger, f"  Samples: {node_stats['sample_count']}")
+                        log_message(logger, f"  Average time diff: {format_time_diff(int(node_stats['avg_diff']))}")
+                        log_message(logger, f"  Max time diff: {format_time_diff(int(node_stats['max_diff']))}")
+                        log_message(logger, f"  Last seen: {format_timestamp(node_stats['last_seen'])}")
+                        log_message(logger, f"  Last reported time: {format_timestamp(node_stats['last_reported_time'])}")
 
-                print("="*70 + "\n")
+                log_message(logger, "="*70 + "\n")
                 last_stats_time = current_time
 
     except KeyboardInterrupt:
-        print("\n\n[+] Stopping monitor...")
+        log_message(logger, "\n\n[+] Stopping monitor...")
 
         # Print final statistics
-        print("\n" + "="*70)
-        print("FINAL STATISTICS")
-        print("="*70)
+        log_message(logger, "\n" + "="*70)
+        log_message(logger, "FINAL STATISTICS")
+        log_message(logger, "="*70)
         stats = tracker.get_statistics()
 
         if not stats:
-            print("No nodes tracked.")
+            log_message(logger, "No nodes tracked.")
         else:
             # Sort by max time diff to show worst offenders first
             sorted_nodes = sorted(
@@ -654,23 +846,23 @@ def main():
                     correct_nodes.append((node_id, node_stats))
 
             if incorrect_nodes:
-                print(f"\n❌ NODES WITH INCORRECT TIME ({len(incorrect_nodes)}):")
+                log_message(logger, f"\n❌ NODES WITH INCORRECT TIME ({len(incorrect_nodes)}):")
                 for node_id, node_stats in incorrect_nodes:
                     alerted = " [ALERTED]" if node_id in tracker.alerted_nodes else ""
-                    print(f"\n  Node: {node_stats['name']}{alerted}")
-                    print(f"    Samples: {node_stats['sample_count']}")
-                    print(f"    Average diff: {format_time_diff(int(node_stats['avg_diff']))}")
-                    print(f"    Max diff: {format_time_diff(int(node_stats['max_diff']))}")
-                    print(f"    Last reported: {format_timestamp(node_stats['last_reported_time'])}")
+                    log_message(logger, f"\n  Node: {node_stats['name']}{alerted}")
+                    log_message(logger, f"    Samples: {node_stats['sample_count']}")
+                    log_message(logger, f"    Average diff: {format_time_diff(int(node_stats['avg_diff']))}")
+                    log_message(logger, f"    Max diff: {format_time_diff(int(node_stats['max_diff']))}")
+                    log_message(logger, f"    Last reported: {format_timestamp(node_stats['last_reported_time'])}")
 
             if correct_nodes:
-                print(f"\n✓ NODES WITH CORRECT TIME ({len(correct_nodes)}):")
+                log_message(logger, f"\n✓ NODES WITH CORRECT TIME ({len(correct_nodes)}):")
                 for node_id, node_stats in correct_nodes:
-                    print(f"  {node_stats['name']}: "
+                    log_message(logger, f"  {node_stats['name']}: "
                           f"avg diff {format_time_diff(int(node_stats['avg_diff']))}, "
                           f"{node_stats['sample_count']} samples")
 
-        print("="*70)
+        log_message(logger, "="*70)
 
     finally:
         monitor.disconnect()
