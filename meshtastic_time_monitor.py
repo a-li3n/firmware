@@ -9,6 +9,9 @@ REQUIREMENTS:
     - Your Meshtastic node must have DEBUG logging enabled
     - The script parses Router POSITION debug logs to extract time information
 
+NOTE: Entries with time=0 (1970-01-01 00:00:00 UTC) are automatically filtered out as they
+      indicate uninitialized time values.
+
 Usage:
     # Serial connection
     python3 meshtastic_time_monitor.py /dev/ttyUSB0
@@ -676,6 +679,12 @@ def main():
                     from_node = f"0x{packet['from']}"
                     position_time = packet['position_time']
 
+                    # Skip epoch zero times (1970-01-01) - indicates uninitialized time
+                    if position_time < 86400:
+                        if args.debug:
+                            log_message(logger, f"[DEBUG] Skipping epoch zero time from {from_node}", 'debug')
+                        continue
+
                     if args.debug:
                         log_message(logger, f"[DEBUG] Parsed position from JSON: node={from_node}, time={position_time}", 'debug')
 
@@ -710,6 +719,12 @@ def main():
                 if router_position:
                     node_id = f"0x{router_position['node']}"
                     position_time = router_position['time']
+
+                    # Skip epoch zero times (1970-01-01) - indicates uninitialized time
+                    if position_time < 86400:
+                        if args.debug:
+                            log_message(logger, f"[DEBUG] Skipping epoch zero time from {node_id}", 'debug')
+                        continue
 
                     if args.debug:
                         log_message(logger, f"[DEBUG] Parsed Router POSITION: node={node_id}, time={position_time}", 'debug')
@@ -766,6 +781,12 @@ def main():
 
                             position = monitor.parse_position_log(next_line)
                             if position:
+                                # Skip epoch zero times (1970-01-01) - indicates uninitialized time
+                                if position['time'] < 86400:
+                                    if args.debug:
+                                        log_message(logger, f"[DEBUG] Skipping epoch zero time from {from_node}", 'debug')
+                                    continue
+
                                 if args.debug:
                                     log_message(logger, f"[DEBUG] Parsed position: time={position['time']}", 'debug')
                                 is_incorrect, time_diff = tracker.update_node_time(
