@@ -399,6 +399,14 @@ void portduinoSetup()
                         cleanupNameForAutoconf("lora-hat-" + std::string(hat_vendor) + "-" + autoconf_product + ".yaml");
                 } else if (found_ch341) {
                     product_config = cleanupNameForAutoconf("lora-usb-" + std::string(autoconf_product) + ".yaml");
+                    // look for more data after the null terminator
+                    size_t len = strlen(autoconf_product);
+                    if (len < 74) {
+                        memcpy(portduino_config.device_id, autoconf_product + len + 1, 16);
+                        if (!memfll(portduino_config.device_id, '\0', 16) && !memfll(portduino_config.device_id, 0xff, 16)) {
+                            portduino_config.has_device_id = true;
+                        }
+                    }
                 }
 
                 // Don't try to automatically find config for a device with RAK eeprom.
@@ -444,9 +452,11 @@ void portduinoSetup()
         ch341Hal->getProductString(product_string, 95);
         std::cout << "CH341 Product " << product_string << std::endl;
         if (strlen(serial) == 8 && portduino_config.mac_address.length() < 12) {
-            uint8_t hash[32] = {0};
+            std::cout << "Deriving MAC address from Serial and Product String" << std::endl;
+            uint8_t hash[104] = {0};
             memcpy(hash, serial, 8);
-            crypto->hash(hash, 8);
+            memcpy(hash + 8, product_string, strlen(product_string));
+            crypto->hash(hash, 8 + strlen(product_string));
             dmac[0] = (hash[0] << 4) | 2;
             dmac[1] = hash[1];
             dmac[2] = hash[2];
@@ -460,11 +470,13 @@ void portduinoSetup()
     }
 
     getMacAddr(dmac);
+#ifndef UNIT_TEST
     if (dmac[0] == 0 && dmac[1] == 0 && dmac[2] == 0 && dmac[3] == 0 && dmac[4] == 0 && dmac[5] == 0) {
         std::cout << "*** Blank MAC Address not allowed!" << std::endl;
         std::cout << "Please set a MAC Address in config.yaml using either MACAddress or MACAddressSource." << std::endl;
         exit(EXIT_FAILURE);
     }
+#endif
     printf("MAC ADDRESS: %02X:%02X:%02X:%02X:%02X:%02X\n", dmac[0], dmac[1], dmac[2], dmac[3], dmac[4], dmac[5]);
     // Rather important to set this, if not running simulated.
     randomSeed(time(NULL));
@@ -473,6 +485,11 @@ void portduinoSetup()
     for (auto i : portduino_config.all_pins) {
         if (i->enabled && i->pin > max_GPIO)
             max_GPIO = i->pin;
+    }
+
+    for (auto i : portduino_config.extra_pins) {
+        if (i.enabled && i.pin > max_GPIO)
+            max_GPIO = i.pin;
     }
 
     gpioInit(max_GPIO + 1); // Done here so we can inform Portduino how many GPIOs we need.
@@ -488,6 +505,19 @@ void portduinoSetup()
         if (i->enabled) {
             if (initGPIOPin(i->pin, gpioChipName + std::to_string(i->gpiochip), i->line) != ERRNO_OK) {
                 printf("Error setting pin number %d. It may not exist, or may already be in use.\n", i->line);
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+    for (auto i : portduino_config.extra_pins) {
+        // In the case of a ch341 Lora device, we don't want to touch the system GPIO lines for Lora
+        // Those GPIO are handled in our usermode driver instead.
+        if (i.config_section == "Lora" && portduino_config.lora_spi_dev == "ch341") {
+            continue;
+        }
+        if (i.enabled) {
+            if (initGPIOPin(i.pin, gpioChipName + std::to_string(i.gpiochip), i.line) != ERRNO_OK) {
+                printf("Error setting pin number %d. It may not exist, or may already be in use.\n", i.line);
                 exit(EXIT_FAILURE);
             }
         }
@@ -705,6 +735,16 @@ bool loadConfig(const char *configPath)
                 portduino_config.has_gps = 1;
             }
         }
+        if (yamlConfig["GPIO"]["ExtraPins"]) {
+            for (auto extra_pin : yamlConfig["GPIO"]["ExtraPins"]) {
+                portduino_config.extra_pins.push_back(pinMapping());
+                portduino_config.extra_pins.back().config_section = "GPIO";
+                portduino_config.extra_pins.back().config_name = "ExtraPins";
+                portduino_config.extra_pins.back().enabled = true;
+                readGPIOFromYaml(extra_pin, portduino_config.extra_pins.back());
+            }
+        }
+
         if (yamlConfig["I2C"]) {
             portduino_config.i2cdev = yamlConfig["I2C"]["I2CDevice"].as<std::string>("");
         }
