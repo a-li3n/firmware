@@ -1,0 +1,401 @@
+# Luckfox Lyra Zero W Complete GPIO Pin Mapping Reference
+# Format compatible with Meshtasticd YAML configuration
+# 
+# GPIO Calculation: pin = bank * 32 + (group * 8 + X)
+# Groups: A=0, B=1, C=2, D=3
+#
+# This mapping is based on the Lyra Zero W pin definition CSV
+# All pins are referenced by their physical header position (1-40)
+
+# ============================================================================
+# POWER PINS (Not GPIO)
+# ============================================================================
+Pin_1_3V3:
+  type: Power
+  voltage: 3.3V
+  note: Output
+
+Pin_2_VSYS:
+  type: Power
+  voltage: 5V
+  note: System voltage input
+
+Pin_4_VSYS:
+  type: Power
+  voltage: 5V
+  note: System voltage input
+
+Pin_17_3V3:
+  type: Power
+  voltage: 3.3V
+  note: Output
+
+# ============================================================================
+# GROUND PINS (Not GPIO)
+# ============================================================================
+Pin_6_GND:
+  type: Ground
+
+Pin_9_GND:
+  type: Ground
+
+Pin_14_GND:
+  type: Ground
+
+Pin_20_GND:
+  type: Ground
+
+Pin_25_GND:
+  type: Ground
+
+Pin_30_GND:
+  type: Ground
+
+Pin_34_GND:
+  type: Ground
+
+Pin_39_GND:
+  type: Ground
+
+# ============================================================================
+# GPIO PINS (Bank 0 - gpiochip 0)
+# ============================================================================
+
+# Pin 3: GPIO0_A0 (RM_IO0) - I2C SDA default
+Pin_3_GPIO0_A0:
+  lyra_gpio: GPIO0_A0
+  rm_io: RM_IO0
+  pin: 0           # 0*32 + (0*8 + 0) = 0
+  gpiochip: 0
+  line: 0
+  default_function: I2C0_SDA
+  raspberry_pi_equivalent: GPIO2
+
+# Pin 5: GPIO0_A1 (RM_IO1) - I2C SCL default
+Pin_5_GPIO0_A1:
+  lyra_gpio: GPIO0_A1
+  rm_io: RM_IO1
+  pin: 1           # 0*32 + (0*8 + 1) = 1
+  gpiochip: 0
+  line: 1
+  default_function: I2C0_SCL
+  raspberry_pi_equivalent: GPIO3
+
+# Pin 7: GPIO0_A2 (RM_IO2)
+Pin_7_GPIO0_A2:
+  lyra_gpio: GPIO0_A2
+  rm_io: RM_IO2
+  pin: 2           # 0*32 + (0*8 + 2) = 2
+  gpiochip: 0
+  line: 2
+  default_function: GPIO
+  raspberry_pi_equivalent: GPIO4
+
+# Pin 8: GPIO0_C6 (RM_IO22) - UART TX default
+Pin_8_GPIO0_C6:
+  lyra_gpio: GPIO0_C6
+  rm_io: RM_IO22
+  pin: 22          # 0*32 + (2*8 + 6) = 22
+  gpiochip: 0
+  line: 22
+  default_function: UART0_TX
+  raspberry_pi_equivalent: GPIO14
+  note: Debug serial port
+
+# Pin 10: GPIO0_C7 (RM_IO23) - UART RX default
+Pin_10_GPIO0_C7:
+  lyra_gpio: GPIO0_C7
+  rm_io: RM_IO23
+  pin: 23          # 0*32 + (2*8 + 7) = 23
+  gpiochip: 0
+  line: 23
+  default_function: UART0_RX
+  raspberry_pi_equivalent: GPIO15
+  note: Debug serial port
+
+# Pin 11: GPIO0_A3 (RM_IO3)
+Pin_11_GPIO0_A3:
+  lyra_gpio: GPIO0_A3
+  rm_io: RM_IO3
+  pin: 3           # 0*32 + (0*8 + 3) = 3
+  gpiochip: 0
+  line: 3
+  default_function: GPIO
+  raspberry_pi_equivalent: GPIO17
+
+# Pin 12: GPIO0_B6 (RM_IO14)
+Pin_12_GPIO0_B6:
+  lyra_gpio: GPIO0_B6
+  rm_io: RM_IO14
+  pin: 14          # 0*32 + (1*8 + 6) = 14
+  gpiochip: 0
+  line: 14
+  default_function: GPIO
+  raspberry_pi_equivalent: GPIO18
+
+# Pin 13: GPIO0_A4 (RM_IO4)
+Pin_13_GPIO0_A4:
+  lyra_gpio: GPIO0_A4
+  rm_io: RM_IO4
+  pin: 4           # 0*32 + (0*8 + 4) = 4
+  gpiochip: 0
+  line: 4
+  default_function: GPIO
+  raspberry_pi_equivalent: GPIO27
+
+# Pin 15: GPIO0_A5 (RM_IO5) - SPI MISO default
+Pin_15_GPIO0_A5:
+  lyra_gpio: GPIO0_A5
+  rm_io: RM_IO5
+  pin: 5           # 0*32 + (0*8 + 5) = 5
+  gpiochip: 0
+  line: 5
+  default_function: SPI0_MISO
+  raspberry_pi_equivalent: GPIO22
+
+# Pin 16: GPIO0_B5 (RM_IO13)
+Pin_16_GPIO0_B5:
+  lyra_gpio: GPIO0_B5
+  rm_io: RM_IO13
+  pin: 13          # 0*32 + (1*8 + 5) = 13
+  gpiochip: 0
+  line: 13
+  default_function: GPIO
+  raspberry_pi_equivalent: GPIO23
+
+# Pin 18: GPIO0_B4 (RM_IO12)
+Pin_18_GPIO0_B4:
+  lyra_gpio: GPIO0_B4
+  rm_io: RM_IO12
+  pin: 12          # 0*32 + (1*8 + 4) = 12
+  gpiochip: 0
+  line: 12
+  default_function: GPIO
+  raspberry_pi_equivalent: GPIO24
+
+# Pin 19: GPIO0_A6 (RM_IO6) - SPI MOSI default
+Pin_19_GPIO0_A6:
+  lyra_gpio: GPIO0_A6
+  rm_io: RM_IO6
+  pin: 6           # 0*32 + (0*8 + 6) = 6
+  gpiochip: 0
+  line: 6
+  default_function: SPI0_MOSI
+  raspberry_pi_equivalent: GPIO10
+
+# Pin 21: GPIO0_A7 (RM_IO7) - SPI MISO default
+Pin_21_GPIO0_A7:
+  lyra_gpio: GPIO0_A7
+  rm_io: RM_IO7
+  pin: 7           # 0*32 + (0*8 + 7) = 7
+  gpiochip: 0
+  line: 7
+  default_function: SPI0_MISO
+  raspberry_pi_equivalent: GPIO9
+
+# Pin 22: GPIO0_B3 (RM_IO11)
+Pin_22_GPIO0_B3:
+  lyra_gpio: GPIO0_B3
+  rm_io: RM_IO11
+  pin: 11          # 0*32 + (1*8 + 3) = 11
+  gpiochip: 0
+  line: 11
+  default_function: GPIO
+  raspberry_pi_equivalent: GPIO25
+
+# Pin 23: GPIO0_B0 (RM_IO8) - SPI CLK default
+Pin_23_GPIO0_B0:
+  lyra_gpio: GPIO0_B0
+  rm_io: RM_IO8
+  pin: 8           # 0*32 + (1*8 + 0) = 8
+  gpiochip: 0
+  line: 8
+  default_function: SPI0_CLK
+  raspberry_pi_equivalent: GPIO11
+
+# Pin 24: GPIO0_B2 (RM_IO10) - SPI CS0 default
+Pin_24_GPIO0_B2:
+  lyra_gpio: GPIO0_B2
+  rm_io: RM_IO10
+  pin: 10          # 0*32 + (1*8 + 2) = 10
+  gpiochip: 0
+  line: 10
+  default_function: SPI0_CS0
+  raspberry_pi_equivalent: GPIO8
+
+# Pin 26: GPIO0_B1 (RM_IO9) - SPI CS1 default
+Pin_26_GPIO0_B1:
+  lyra_gpio: GPIO0_B1
+  rm_io: RM_IO9
+  pin: 9           # 0*32 + (1*8 + 1) = 9
+  gpiochip: 0
+  line: 9
+  default_function: SPI0_CS1
+  raspberry_pi_equivalent: GPIO7
+
+# Pin 35: GPIO0_C0 (RM_IO16)
+Pin_35_GPIO0_C0:
+  lyra_gpio: GPIO0_C0
+  rm_io: RM_IO16
+  pin: 16          # 0*32 + (2*8 + 0) = 16
+  gpiochip: 0
+  line: 16
+  default_function: GPIO
+  raspberry_pi_equivalent: GPIO19
+
+# Pin 38: GPIO0_C1 (RM_IO17)
+Pin_38_GPIO0_C1:
+  lyra_gpio: GPIO0_C1
+  rm_io: RM_IO17
+  pin: 17          # 0*32 + (2*8 + 1) = 17
+  gpiochip: 0
+  line: 17
+  default_function: GPIO
+  raspberry_pi_equivalent: GPIO20
+
+# Pin 40: GPIO0_C2 (RM_IO18)
+Pin_40_GPIO0_C2:
+  lyra_gpio: GPIO0_C2
+  rm_io: RM_IO18
+  pin: 18          # 0*32 + (2*8 + 2) = 18
+  gpiochip: 0
+  line: 18
+  default_function: GPIO
+  raspberry_pi_equivalent: GPIO21
+
+# ============================================================================
+# GPIO PINS (Bank 1 - gpiochip 1)
+# ============================================================================
+
+# Pin 27: GPIO1_B1 (RM_IO24) - I2C ID_SD
+Pin_27_GPIO1_B1:
+  lyra_gpio: GPIO1_B1
+  rm_io: RM_IO24
+  pin: 41          # 1*32 + (1*8 + 1) = 41
+  gpiochip: 1
+  line: 9
+  default_function: I2C_ID_SD
+  raspberry_pi_equivalent: ID_SD
+
+# Pin 28: GPIO1_D3 (RM_IO31) - I2C ID_SC
+Pin_28_GPIO1_D3:
+  lyra_gpio: GPIO1_D3
+  rm_io: RM_IO31
+  pin: 59          # 1*32 + (3*8 + 3) = 59
+  gpiochip: 1
+  line: 27
+  default_function: I2C_ID_SC
+  raspberry_pi_equivalent: ID_SC
+
+# Pin 29: GPIO1_B2 (RM_IO25)
+Pin_29_GPIO1_B2:
+  lyra_gpio: GPIO1_B2
+  rm_io: RM_IO25
+  pin: 42          # 1*32 + (1*8 + 2) = 42
+  gpiochip: 1
+  line: 10
+  default_function: GPIO
+  raspberry_pi_equivalent: GPIO5
+
+# Pin 31: GPIO1_B3 (RM_IO26)
+Pin_31_GPIO1_B3:
+  lyra_gpio: GPIO1_B3
+  rm_io: RM_IO26
+  pin: 43          # 1*32 + (1*8 + 3) = 43
+  gpiochip: 1
+  line: 11
+  default_function: GPIO
+  raspberry_pi_equivalent: GPIO6
+
+# Pin 32: GPIO1_D2 (RM_IO30)
+Pin_32_GPIO1_D2:
+  lyra_gpio: GPIO1_D2
+  rm_io: RM_IO30
+  pin: 58          # 1*32 + (3*8 + 2) = 58
+  gpiochip: 1
+  line: 26
+  default_function: GPIO
+  raspberry_pi_equivalent: GPIO12
+
+# Pin 33: GPIO1_C2 (RM_IO27)
+Pin_33_GPIO1_C2:
+  lyra_gpio: GPIO1_C2
+  rm_io: RM_IO27
+  pin: 50          # 1*32 + (2*8 + 2) = 50
+  gpiochip: 1
+  line: 18
+  default_function: GPIO
+  raspberry_pi_equivalent: GPIO13
+
+# Pin 36: GPIO1_D1 (RM_IO29)
+Pin_36_GPIO1_D1:
+  lyra_gpio: GPIO1_D1
+  rm_io: RM_IO29
+  pin: 57          # 1*32 + (3*8 + 1) = 57
+  gpiochip: 1
+  line: 25
+  default_function: GPIO
+  raspberry_pi_equivalent: GPIO16
+
+# Pin 37: GPIO1_C3 (RM_IO28)
+Pin_37_GPIO1_C3:
+  lyra_gpio: GPIO1_C3
+  rm_io: RM_IO28
+  pin: 51          # 1*32 + (2*8 + 3) = 51
+  gpiochip: 1
+  line: 19
+  default_function: GPIO
+  raspberry_pi_equivalent: GPIO26
+
+# ============================================================================
+# COMPARISON: Lyra Pi vs Lyra Zero W
+# ============================================================================
+# The key difference between Lyra Pi and Lyra Zero W is that:
+# - Lyra Zero W uses ALL Matrix IO pins (RM_IO0-31)
+# - Lyra Pi has pins 35-40 as GPIO1_A* (native GPIO, no RM_IO assignment)
+#
+# On Lyra Zero W, pins 35-40 ARE routed through Matrix IO:
+# - Pin 35: GPIO0_C0 (RM_IO16) - Matrix IO
+# - Pin 36: GPIO1_D1 (RM_IO29) - Matrix IO
+# - Pin 37: GPIO1_C3 (RM_IO28) - Matrix IO
+# - Pin 38: GPIO0_C1 (RM_IO17) - Matrix IO
+# - Pin 40: GPIO0_C2 (RM_IO18) - Matrix IO
+#
+# This means Lyra Zero W has NO native GPIO pins - ALL GPIO pins go through
+# the Matrix IO multiplexer, which introduces millisecond-level latency.
+# ============================================================================
+
+# ============================================================================
+# IMPORTANT: TIMING-CRITICAL APPLICATIONS
+# ============================================================================
+# Unlike the Lyra Pi, the Lyra Zero W does NOT have any native GPIO pins.
+# ALL pins go through the Rockchip Matrix IO multiplexer.
+#
+# This means:
+# - LR1121 radios WILL NOT WORK on Lyra Zero W (requires microsecond timing)
+# - SX1262 radios SHOULD work (more timing-tolerant)
+# - Use Raspberry Pi Zero W or nRF52840 platforms for LR1121 radios
+# ============================================================================
+
+# ============================================================================
+# EXAMPLE MESHTASTIC CONFIG FOR LYRA ZERO W
+# ============================================================================
+# All pins have Matrix IO latency, but SX1262 should still work
+#
+# Example_SX1262_Config:
+#   CS:
+#     pin: 10      # Pin 24 - GPIO0_B2 (RM_IO10)
+#     gpiochip: 0
+#     line: 10
+#   IRQ:
+#     pin: 16      # Pin 35 - GPIO0_C0 (RM_IO16)
+#     gpiochip: 0
+#     line: 16
+#   Busy:
+#     pin: 17      # Pin 38 - GPIO0_C1 (RM_IO17)
+#     gpiochip: 0
+#     line: 17
+#   Reset:
+#     pin: 14      # Pin 12 - GPIO0_B6 (RM_IO14)
+#     gpiochip: 0
+#     line: 14
