@@ -1,0 +1,76 @@
+# Example Meshtastic Serial Output
+# This shows what typical serial output looks like when monitoring for time synchronization
+
+# Example 1: Text format - Position packet received
+handleReceived(REMOTE) (id=0x12345678 fr=0x87654321 to=0xffffffff, transport = 1, WantAck=0, HopLim=3 Ch=0x0 Portnum=3 rxtime=1704988800 rxSNR=5.5 rxRSSI=-95)
+Position packet: time=1704988795 lat=374544000 lon=-1220569000
+
+# Example 2: Text format - Position packet from another node
+handleReceived(REMOTE) (id=0xabcdef01 fr=0xdeadbeef to=0xffffffff, transport = 1, WantAck=0, HopLim=2 Ch=0x0 Portnum=3 rxtime=1704988900 rxSNR=8.2 rxRSSI=-82)
+Position packet: time=1704988897 lat=374550000 lon=-1220570000
+
+# Example 3: Text format - Position packet with incorrect time (node has bad RTC)
+handleReceived(REMOTE) (id=0x11223344 fr=0x12345678 to=0xffffffff, transport = 1, WantAck=0, HopLim=3 Ch=0x0 Portnum=3 rxtime=1704988950 rxSNR=3.1 rxRSSI=-105)
+Position packet: time=1672444800 lat=374555000 lon=-1220565000
+# Note: time=1672444800 is 2023-01-01, which is way off from rx_time=1704988950 (2024-01-11)
+
+# Example 4: JSON format (when ENABLE_JSON_LOGGING is enabled)
+TRACE: {"from":2271560481,"to":4294967295,"id":305419896,"transport":1,"channel":0,"hopLimit":3,"rxTime":1704988800,"rxSnr":5.5,"rxRssi":-95,"type":"position","payload":{"time":1704988795,"latitude_i":374544000,"longitude_i":-1220569000,"altitude":100,"PDOP":100,"satsInView":12}}
+
+# Example 5: JSON format - Node with bad time
+TRACE: {"from":305419896,"to":4294967295,"id":2882400001,"transport":1,"channel":0,"hopLimit":3,"rxTime":1704989000,"rxSnr":3.1,"rxRssi":-105,"type":"position","payload":{"time":1672444800,"latitude_i":374555000,"longitude_i":-1220565000,"altitude":50,"PDOP":150}}
+
+# Example 6: Text format - Other packet types (not position)
+handleReceived(REMOTE) (id=0xaabbccdd fr=0x11111111 to=0xffffffff, transport = 1, WantAck=0, HopLim=3 Ch=0x0 Portnum=67 rxtime=1704989100 rxSNR=7.3 rxRSSI=-88)
+# Portnum=67 is TELEMETRY_APP, not position
+
+# Example 7: Text format - Encrypted packet (can't see position data)
+handleReceived(REMOTE) (id=0x55667788 fr=0x99aabbcc to=0xffffffff, transport = 1, WantAck=0, HopLim=3 Ch=0x0 encrypted len=64 rxtime=1704989200 rxSNR=6.0 rxRSSI=-92)
+
+# Example 8: Text format - Local packet (sent by this node)
+handleReceived(LOCAL) (id=0xfedcba98 fr=0x12340000 to=0xffffffff, transport = 1, WantAck=0, HopLim=3 Ch=0x0 Portnum=3 rxtime=1704989250)
+Position packet: time=1704989250 lat=374560000 lon=-1220560000
+
+# Example 9: Multiple position updates from same node showing time drift
+handleReceived(REMOTE) (id=0x10101010 fr=0xbaadf00d to=0xffffffff, transport = 1, WantAck=0, HopLim=3 Ch=0x0 Portnum=3 rxtime=1704989300 rxSNR=5.5 rxRSSI=-95)
+Position packet: time=1704989295 lat=374544000 lon=-1220569000
+
+handleReceived(REMOTE) (id=0x10101011 fr=0xbaadf00d to=0xffffffff, transport = 1, WantAck=0, HopLim=3 Ch=0x0 Portnum=3 rxtime=1704990200 rxSNR=5.8 rxRSSI=-93)
+Position packet: time=1704990180 lat=374544100 lon=-1220569100
+# Note: 900 seconds elapsed (rx_time diff), but node reports 885 seconds (time diff)
+# This indicates the node's clock is running slow by 15 seconds over 15 minutes
+
+# Example 10: Admin module setting time
+INFO | AdminModule.cpp:411 | Client received set_time_only command
+INFO | RTC.cpp:198 | Setting RTC quality to RTCQualityNTP, time=1704989400
+
+# Example 11: GPS time sync
+INFO | GPS.cpp:523 | GPS lock acquired, setting time from GPS
+INFO | RTC.cpp:198 | Setting RTC quality to RTCQualityGPS, time=1704989500
+
+# Example 12: Position module logging (useful for debugging)
+INFO | PositionModule.cpp:340 | Send pos@1704989600:6 to mesh (wantReplies=0)
+INFO | PositionModule.cpp:216 | Use RTC time for position
+INFO | PositionModule.cpp:271 | Position packet: time=1704989600 lat=374560000 lon=-1220560000
+
+# Example 13: Position module rejecting low quality time
+INFO | PositionModule.cpp:219 | Strip low RTCQuality (2) time from position
+
+# Example 14: Router logging decoded message
+decoded message (id=0x20202020 fr=0xcafebabe to=0xffffffff, transport = 1, WantAck=0, HopLim=3 Ch=0x0 Portnum=3 rxtime=1704989700 rxSNR=4.2 rxRSSI=-98)
+
+# Example 15: Complete sequence showing position broadcast cycle
+Started Tx (id=0x30303030 fr=0x12340000 to=0xffffffff, transport = 1, WantAck=0, HopLim=3 Ch=0x0 Portnum=3)
+Completed sending (id=0x30303030 fr=0x12340000 to=0xffffffff, transport = 1, WantAck=0, HopLim=3 Ch=0x0 Portnum=3)
+handleReceived(LOCAL) (id=0x30303030 fr=0x12340000 to=0xffffffff, transport = 1, WantAck=0, HopLim=3 Ch=0x0 Portnum=3 rxtime=1704989800)
+Position packet: time=1704989800 lat=374560000 lon=-1220560000
+
+# Notes on parsing:
+# - Position packets have Portnum=3 (meshtastic_PortNum_POSITION_APP)
+# - rx_time is when the packet was received (set by receiving node)
+# - Position.time is the actual time reported by the sending node
+# - Time values are Unix timestamps (seconds since 1970-01-01 00:00:00 UTC)
+# - To convert: date -d @1704989800  (Linux/Mac)
+# - Node IDs are in hex format (0x12345678)
+# - SNR (Signal to Noise Ratio) in dB - higher is better
+# - RSSI (Received Signal Strength Indicator) in dBm - closer to 0 is stronger
