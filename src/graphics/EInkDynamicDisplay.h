@@ -6,7 +6,11 @@
 #if defined(USE_EINK) && defined(USE_EINK_DYNAMICDISPLAY)
 
 #include "EInkDisplay2.h"
+#ifdef EINK_DISPLAY_CLASS_3C
+#include "GxEPD2_3C.h"
+#else
 #include "GxEPD2_BW.h"
+#endif
 #include "concurrency/NotifiedWorkerThread.h"
 
 /*

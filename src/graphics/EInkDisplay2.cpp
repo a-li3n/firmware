@@ -6,6 +6,10 @@
 #include "main.h"
 #include <SPI.h>
 
+#ifdef EINK_DISPLAY_CLASS_3C
+#include "GxEPD2_3C.h"
+#endif
+
 #ifdef GXEPD2_DRIVER_0
 #include "einkDetect.h"
 #endif
@@ -74,7 +78,12 @@ bool EInkDisplay::forceDisplay(uint32_t msecLimit)
         for (uint32_t x = 0; x < displayWidth; x++) {
             auto b = buffer[x + (y / 8) * displayWidth];
             auto isset = b & (1 << (y & 7));
+#ifdef EINK_DISPLAY_CLASS_3C
+            adafruitDisplay->drawPixel((displayWidth - 1) - x, (displayHeight - 1) - y,
+                                       isset ? GxEPD_COLORED : GxEPD_WHITE);
+#else
             adafruitDisplay->drawPixel((displayWidth - 1) - x, (displayHeight - 1) - y, isset ? GxEPD_BLACK : GxEPD_WHITE);
+#endif
         }
     }
 #else
@@ -83,9 +92,18 @@ bool EInkDisplay::forceDisplay(uint32_t msecLimit)
             auto b = buffer[x + (y / 8) * displayWidth];
             auto isset = b & (1 << (y & 7));
             if (flipped)
+#ifdef EINK_DISPLAY_CLASS_3C
+                adafruitDisplay->drawPixel((displayWidth - 1) - x, (displayHeight - 1) - y,
+                                           isset ? GxEPD_COLORED : GxEPD_WHITE);
+#else
                 adafruitDisplay->drawPixel((displayWidth - 1) - x, (displayHeight - 1) - y, isset ? GxEPD_BLACK : GxEPD_WHITE);
+#endif
             else
+#ifdef EINK_DISPLAY_CLASS_3C
+                adafruitDisplay->drawPixel(x, y, isset ? GxEPD_COLORED : GxEPD_WHITE);
+#else
                 adafruitDisplay->drawPixel(x, y, isset ? GxEPD_BLACK : GxEPD_WHITE);
+#endif
         }
     }
 #endif
@@ -198,13 +216,23 @@ bool EInkDisplay::connect()
     {
         if (eink_found) {
             auto lowLevel = new EINK_DISPLAY_MODEL(PIN_EINK_CS, PIN_EINK_DC, PIN_EINK_RES, PIN_EINK_BUSY);
+#ifdef EINK_DISPLAY_CLASS_3C
+            adafruitDisplay = new GxEPD2_3C<EINK_DISPLAY_MODEL, EINK_DISPLAY_MODEL::HEIGHT>(*lowLevel);
+#else
             adafruitDisplay = new GxEPD2_BW<EINK_DISPLAY_MODEL, EINK_DISPLAY_MODEL::HEIGHT>(*lowLevel);
+#endif
             adafruitDisplay->init(115200, true, 10, false, SPI1, SPISettings(4000000, MSBFIRST, SPI_MODE0));
+#ifdef EINK_DISPLAY_CLASS_3C
+            // Tri-color eInk does not support fast/partial refresh — use full refresh
+            adafruitDisplay->setRotation(3);
+            adafruitDisplay->setFullWindow();
+#else
             // RAK14000 2.13 inch b/w 250x122 does actually now support fast refresh
             adafruitDisplay->setRotation(3);
             // Fast refresh support for  1.54, 2.13 RAK14000 b/w , 2.9 and 4.2
             // adafruitDisplay->setRotation(1);
             adafruitDisplay->setPartialWindow(0, 0, displayWidth, displayHeight);
+#endif
         } else {
             (void)adafruitDisplay;
         }
