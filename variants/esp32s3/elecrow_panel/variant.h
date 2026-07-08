@@ -16,6 +16,11 @@
 #define DAC_I2S_WS 11
 #define DAC_I2S_DOUT 12
 #define DAC_I2S_MCLK 8 // don't use GPIO0 because it's assigned to LoRa or button
+#elif CROW_SELECT == 3
+// V1.3 large displays: buzzer is on STC8H1K28 co-processor via I2C, not GPIO
+// PIN_BUZZER is NOT defined — buzzer is handled via I2C commands to 0x30
+// (246=on, 247=off). See LGFX_ELECROW70_V13.h for the driver.
+#define STC8H_I2C_ADDR 0x30
 #else
 #define PIN_BUZZER 8
 #endif
@@ -33,24 +38,34 @@
 #endif
 
 // Extension Slot Layout, viewed from above (2.4-3.5)
-// DIO1/IO1 o   o IO2/NRESET
-// SCK/IO10 o   o IO16/NC
-// MISO/IO9 o   o IO15/NC
-// MOSI/IO3 o   o NC/DIO2
-//      3V3 o   o IO46/BUSY
-//      GND o   o IO0/NSS
-//    5V/NC o   o NC/DIO3
-//         J9   J8
+// DIO1/IO1 o o IO2/NRESET
+// SCK/IO10 o o IO16/NC
+// MISO/IO9 o o IO15/NC
+// MOSI/IO3 o o NC/DIO2
+// 3V3 o o IO46/BUSY
+// GND o o IO0/NSS
+// 5V/NC o o NC/DIO3
+// J9 J8
 
-// Extension Slot Layout, viewed from above (4.3-7.0)
-// !! DIO1/IO20 o   o IO19/NRESET !!
-// !!   SCK/IO5 o   o IO16/NC
-// !!  MISO/IO4 o   o IO15/NC
-// !!  MOSI/IO6 o   o NC/DIO2
-//          3V3 o   o IO2/BUSY !!
-//          GND o   o IO0/NSS
-//        5V/NC o   o NC/DIO3
-//             J9   J8
+// Extension Slot Layout, viewed from above (4.3-7.0) V1.0
+// !! DIO1/IO20 o o IO19/NRESET !!
+// !! SCK/IO5 o o IO16/NC
+// !! MISO/IO4 o o IO15/NC
+// !! MOSI/IO6 o o NC/DIO2
+// 3V3 o o IO2/BUSY !!
+// GND o o IO0/NSS
+// 5V/NC o o NC/DIO3
+// J9 J8
+
+// Extension Slot Layout, viewed from above (4.3-7.0) V1.3
+// !! DIO1/IO20 o o IO19/NRESET !!
+// !! SCK/IO5 o o IO16/NC
+// !! MISO/IO4 o o IO15/NC
+// !! MOSI/IO6 o o NC
+// 3V3 o o IO2/BUSY !!
+// GND o o IO8/NSS !! (moved from IO0 on V1.0)
+// 5V o o NC
+// J9 J8
 
 // LoRa
 #define USE_SX1262
@@ -64,14 +79,24 @@
 #define LORA_MOSI 3
 
 #define LORA_RESET 2
-#define LORA_DIO1 1  // SX1262 IRQ
+#define LORA_DIO1 1 // SX1262 IRQ
 #define LORA_DIO2 46 // SX1262 BUSY
 
 // need to pull IO45 low to enable LORA and disable Microphone on 24 28 35
 #define SENSOR_POWER_CTRL_PIN 45
 #define SENSOR_POWER_ON LOW
+#elif CROW_SELECT == 3
+// 4.3", 5.0", 7.0" (V1.3 -- NSS moved to IO8)
+#define LORA_CS 8
+#define LORA_SCK 5
+#define LORA_MISO 4
+#define LORA_MOSI 6
+
+#define LORA_RESET 19
+#define LORA_DIO1 20 // SX1262 IRQ
+#define LORA_DIO2 2 // SX1262 BUSY
 #else
-// 4.3", 5.0", 7.0"
+// 4.3", 5.0", 7.0" (V1.0)
 #define LORA_CS 0
 #define LORA_SCK 5
 #define LORA_MISO 4
@@ -79,7 +104,7 @@
 
 #define LORA_RESET 19
 #define LORA_DIO1 20 // SX1262 IRQ
-#define LORA_DIO2 2  // SX1262 BUSY
+#define LORA_DIO2 2 // SX1262 BUSY
 #endif
 
 #define SX126X_CS LORA_CS
