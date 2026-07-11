@@ -111,12 +111,10 @@ fi
 POSTRM
 chmod 755 "$PKG_DIR/DEBIAN/postrm"
 
-# Control file — no hard-coded Depends.
-# The official native-install.sh assumes the user has installed system deps
-# manually (libgpiod, libi2c, libbluetooth, libuv1, yaml-cpp, jsoncpp, etc.).
-# Hard-coding package names breaks across Debian/Ubuntu/Armbian versions
-# where the soname suffix differs (e.g. libyaml-cpp0.7 vs 0.8).
-# The binary's ELF NEEDED entries are the source of truth for what's required.
+# Control file — dependency list matched to the official OBS daily build for Debian 13.
+# These are the correct Debian Trixie/13 package names (including the t64 transition suffixes).
+# For Debian 12 (bookworm) or Armbian, some package names may differ slightly —
+# in that case use `dpkg -i --force-depends` and install missing libs manually.
 cat > "$PKG_DIR/DEBIAN/control" << CONTROL
 Package: meshtasticd
 Version: $VERSION
@@ -125,8 +123,8 @@ Maintainer: Meshtastic <contact@meshtastic.org>
 Section: net
 Priority: optional
 Installed-Size: $(du -sk "$PKG_DIR" | cut -f1)
+Depends: adduser, libc6 (>= 2.38), libgcc-s1 (>= 3.0), libgpiod3 (>= 2.1), libi2c0 (>= 4.0), libinput10 (>= 0.15.0), libjsoncpp26 (>= 1.9.6), liborcania2.3 (>= 2.1.0), libsdl2-2.0-0 (>= 2.0.18), libssl3t64 (>= 3.0.0), libstdc++6 (>= 11), libulfius2.7t64 (>= 2.7.0), libusb-1.0-0 (>= 2:1.0.22), libuv1t64 (>= 1.4.2), libx11-6, libxkbcommon0 (>= 0.5.0), libyaml-cpp0.8 (>= 0.8.0+dfsg-7)
 Recommends: systemd
-Suggests: libgpiod2, libi2c0, libbluetooth3, libuv1, libyaml-cpp0.8, libjsoncpp26, libusb-1.0-0, libbsd0, libssl3
 Description: Meshtastic native daemon (meshtasticd)
  Native Linux port of the Meshtastic firmware, built for the
  portduino platform. Supports LoRa radio modules attached via
@@ -135,10 +133,6 @@ Description: Meshtastic native daemon (meshtasticd)
  .
  Includes systemd service, default config, and hardware
  config templates for common SBC radio hats.
- .
- Required shared libraries (install via your distro's package manager):
-   libgpiod, libi2c, libbluetooth, libuv1, libyaml-cpp, libjsoncpp,
-   libusb-1.0, libbsd, libssl3
 CONTROL
 
 # Build the .deb
