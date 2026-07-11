@@ -54,7 +54,7 @@ fi
 
 # Create meshtasticd user via postinst
 cat > "$PKG_DIR/DEBIAN/postinst" << 'POSTINST'
-#!/bin/bin/sh
+#!/bin/sh
 set -e
 
 # Create system user/group if they don't exist
