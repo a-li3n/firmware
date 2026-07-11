@@ -5,6 +5,11 @@ ENV LANG=C.UTF-8
 ENV TZ=UTC
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
+# Remove PEP 668 externally-managed marker — this is a build container,
+# not a managed system. PlatformIO spawns subprocess pip installs that
+# don't always respect --break-system-packages or the env var.
+RUN rm -f /usr/lib/python3.*/EXTERNALLY-MANAGED
+
 # System build dependencies for the native/portduino target (Debian 12 / Trixie)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
