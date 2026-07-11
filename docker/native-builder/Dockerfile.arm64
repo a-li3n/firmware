@@ -1,0 +1,48 @@
+FROM debian:12
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+ENV TZ=UTC
+
+# System build dependencies for the native/portduino target (Debian 12 / Trixie)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    g++ \
+    cmake \
+    pkg-config \
+    git \
+    curl \
+    ca-certificates \
+    python3 \
+    python3-pip \
+    python3-venv \
+    # Native radio / hardware libs
+    libgpiod-dev \
+    libi2c-dev \
+    libbluetooth-dev \
+    # Networking / async
+    libuv1-dev \
+    # Config / serialization
+    libyaml-cpp-dev \
+    libjsoncpp-dev \
+    # HTTP / TLS (ulfius, openssl)
+    libulfius-dev \
+    libssl-dev \
+    # Display (native-tft variant)
+    libsdl2-dev \
+    # BSD helpers
+    libbsd-dev \
+    # USB (ch341 userspace SPI library)
+    libusb-1.0-0-dev \
+    # Debian package building
+    dpkg-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# PlatformIO CLI
+RUN pip3 install --no-cache-dir platformio
+
+# Pre-cache the platform-native framework to avoid first-build download issues
+RUN pio pkg install -g -p "https://github.com/meshtastic/platform-native/archive/61067ac3774e4fe27aa9762c72cebea507f116c8.zip" || true
+
+WORKDIR /firmware

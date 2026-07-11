@@ -1,0 +1,23 @@
+services:
+  native-builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    container_name: meshtastic-native-builder
+    volumes:
+      # Mount the firmware source tree
+      - ../..:/firmware
+      # Persist PlatformIO's cache between runs (deps, compilers, frameworks)
+      - pio-cache:/root/.platformio
+    working_dir: /firmware
+    # Build the native target, then package into a .deb
+    command: >
+      bash -c "pio run -e native && bash docker/native-builder/package-deb.sh"
+    # If you need real SPI/GPIO hardware access at runtime, uncomment these:
+    # devices:
+    #   - /dev/spidev0.0
+    # privileged: true
+
+volumes:
+  pio-cache:
