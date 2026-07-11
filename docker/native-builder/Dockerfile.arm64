@@ -40,7 +40,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # PlatformIO CLI
-RUN pip3 install --no-cache-dir platformio
+RUN pip3 install --no-cache-dir --break-system-packages platformio
 
 # Pre-cache the platform-native framework to avoid first-build download issues
 RUN pio pkg install -g -p "https://github.com/meshtastic/platform-native/archive/61067ac3774e4fe27aa9762c72cebea507f116c8.zip" || true
