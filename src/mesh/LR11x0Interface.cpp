@@ -378,4 +378,12 @@ template <typename T> int16_t LR11x0Interface<T>::getCurrentRSSI()
 #endif
     return (int16_t)round(rssi);
 }
+
+// Clean up portduino macros so they don't leak into other translation units
+// (e.g. LR20x0Interface.cpp) when included via InterfacesTemplates.cpp
+#ifdef ARCH_PORTDUINO
+#undef rfswitch_dio_pins
+#undef rfswitch_table
+#endif
+
 #endif
