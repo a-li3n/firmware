@@ -3,6 +3,7 @@ FROM debian:12
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
 ENV TZ=UTC
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 # System build dependencies for the native/portduino target (Debian 12 / Trixie)
 RUN apt-get update && apt-get install -y --no-install-recommends \
