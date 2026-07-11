@@ -1,0 +1,19 @@
+services:
+  native-builder-armhf:
+    build:
+      context: .
+      dockerfile: Dockerfile.arm64
+    platform: linux/arm/v7
+    container_name: meshtastic-native-builder-armhf
+    volumes:
+      # Mount the firmware source tree
+      - ../..:/firmware
+      # Persist PlatformIO's cache between runs (deps, compilers, frameworks)
+      - pio-cache-armhf:/root/.platformio
+    working_dir: /firmware
+    # Build the native target, then package into a .deb
+    command: >
+      bash -c "pio run -e native && bash docker/native-builder/package-deb.sh"
+
+volumes:
+  pio-cache-armhf:
