@@ -1,14 +1,20 @@
 ---
 Meta:
-  name: Femtofox LR2021 with TCXO
+  name: Femtofox LR2021 with TCXO (GNiceRF LoRa2021F33-2G4)
   support: community
   compatible:
     - luckfox-pico-mini # Armbian
 
 Lora:
-## LR2021 radio module (SubGHz + 2.4GHz wideband)
+## GNiceRF LoRa2021F33-2G4 — 2W high-power dual-band LR2021 module
+## Integrated FEM (PA + LNA) with RF switch control via DIO5/DIO6/DIO8
 ## Pin mapping matches the femtofox LR1121 template
-## No external RF switch — radio handles switching internally
+##
+## RF switch topology follows the Seeed Mesh Tracker X1 / T1000-E reference:
+##   DIO5 -> antenna path select (HIGH = sub-GHz LF)
+##   DIO6 -> TX enable / HP PA select
+##   DIO7 -> not connected
+##   DIO8 -> RF front-end power enable
   Module: lr2021
   gpiochip: 1 # subtract 32 from the gpio numbers
   DIO3_TCXO_VOLTAGE: 1.8
@@ -17,10 +23,20 @@ Lora:
   Busy: 22 #pin16 / GPIO54 1C6
   Reset: 25 #pin13 / GPIO57 1D1
 
-  # SubGHz max power (dBm). Default 22, max 22.
+  # SubGHz max power (dBm). Chip raw max 22, module FEM amplifies beyond that.
   LR2021_MAX_POWER: 22
-  # 2.4GHz max power (dBm). Default 12, max 12.
+  # 2.4GHz max power (dBm).
   LR2021_MAX_POWER_HF: 12
 
   spidev: spidev0.0 #pins are (CS=16, CLK=17, MOSI=18, MISO=19)
   spiSpeed: 2000000
+
+  # RF switch table for integrated FEM
+  # DIO5=antenna select, DIO6=TX enable, DIO7=NC, DIO8=FEM power enable
+  rfswitch_table:
+    pins: ["DIO5", "DIO6", "DIO7", "DIO8"]
+    MODE_STBY: ["LOW", "LOW", "LOW", "LOW"]
+    MODE_RX: ["HIGH", "LOW", "LOW", "HIGH"]
+    MODE_TX: ["HIGH", "HIGH", "LOW", "HIGH"]
+    MODE_TX_HP: ["LOW", "LOW", "LOW", "LOW"]
+    MODE_TX_HF: ["LOW", "LOW", "LOW", "LOW"]
