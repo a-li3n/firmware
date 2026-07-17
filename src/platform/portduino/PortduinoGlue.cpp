@@ -836,6 +836,8 @@ bool loadConfig(const char *configPath)
                 portduino_config.lr2021_max_power_hf = yamlConfig["Lora"]["LR2021_MAX_POWER_HF"].as<int>(12);
             if (yamlConfig["Lora"]["IRQ_DIO_NUM"])
                 portduino_config.lr2021_irq_dio_num = yamlConfig["Lora"]["IRQ_DIO_NUM"].as<int>(0);
+            else if (yamlConfig["Lora"]["LR2021_IRQ_DIO_NUM"])
+                portduino_config.lr2021_irq_dio_num = yamlConfig["Lora"]["LR2021_IRQ_DIO_NUM"].as<int>(0);
             if (yamlConfig["Lora"]["RF95_MAX_POWER"])
                 portduino_config.rf95_max_power = yamlConfig["Lora"]["RF95_MAX_POWER"].as<int>(20);
 
