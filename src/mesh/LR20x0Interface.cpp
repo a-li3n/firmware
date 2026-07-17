@@ -84,7 +84,7 @@ template <typename T> bool LR20x0Interface<T>::init()
 
     RadioLibInterface::init();
 
-    // Set irqDioNum BEFORE lora.begin() — begin() → config() calls setDioFunction(irqDioNum, IRQ)
+    // Set irqDioNum BEFORE lora.begin() - begin() → config() calls setDioFunction(irqDioNum, IRQ)
     // to program the chip's internal DIO routing. Changing it after begin() is too late.
     // This is critical when DIO5 is used for RF switch control: the default irqDioNum=5 would
     // conflict with the RF switch table, causing setRfSwitchTable() to reconfigure DIO5 from
