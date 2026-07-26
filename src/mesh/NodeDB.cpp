@@ -957,6 +957,12 @@ void NodeDB::installDefaultConfig(bool preserveKey = false)
 
     config.security.admin_key_count = numAdminKeys;
 
+    // Left at COMPATIBLE when signature checking is compiled out, so we never report a policy
+    // nothing enforces (mirrors the set-config guard in AdminModule).
+#if defined(USERPREFS_CONFIG_SECURITY_PACKET_SIGNATURE_POLICY) && !(MESHTASTIC_EXCLUDE_PKI) && !(MESHTASTIC_EXCLUDE_XEDDSA)
+    config.security.packet_signature_policy = USERPREFS_CONFIG_SECURITY_PACKET_SIGNATURE_POLICY;
+#endif
+
     if (shouldPreserveKey) {
         config.security.private_key.size = 32;
         memcpy(config.security.private_key.bytes, private_key_temp, config.security.private_key.size);
@@ -3002,6 +3008,7 @@ bool NodeDB::saveToDiskNoRetry(int saveWhat)
         moduleConfig.has_audio = true;
         moduleConfig.has_paxcounter = true;
         moduleConfig.has_statusmessage = true;
+        moduleConfig.has_tak = true;
 #if !MESHTASTIC_EXCLUDE_BEACON
         moduleConfig.has_mesh_beacon = true;
 #endif
@@ -3776,6 +3783,22 @@ bool NodeDB::copyPublicKey(NodeNum n, meshtastic_NodeInfoLite_public_key_t &out)
     // encrypt to. Keys here may be trust-on-first-use (see copyPublicKey's signerProven), the
     // same first-contact trust NodeDB itself applies via updateUser().
     if (trafficManagementModule && trafficManagementModule->copyPublicKey(n, out.bytes)) {
+        out.size = 32;
+        return true;
+    }
+#endif
+    return false;
+}
+
+bool NodeDB::copyPublicKeyForDecrypt(NodeNum n, meshtastic_NodeInfoLite_public_key_t &out)
+{
+    if (copyPublicKeyAuthoritative(n, out))
+        return true;
+#if HAS_TRAFFIC_MANAGEMENT
+    // A cold-tier cache key backs an authenticated decrypt only when signer-proven; unverified TOFU
+    // cache keys must not. Outbound encryption still uses the opportunistic copyPublicKey().
+    bool signerProven = false;
+    if (trafficManagementModule && trafficManagementModule->copyPublicKey(n, out.bytes, &signerProven) && signerProven) {
         out.size = 32;
         return true;
     }

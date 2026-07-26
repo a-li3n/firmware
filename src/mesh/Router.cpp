@@ -70,8 +70,8 @@ static uint8_t bytes[MAX_LORA_PAYLOAD_LEN + 1] __attribute__((__aligned__));
 
 struct RoutingAuthCache {
     bool valid = false;
-    meshtastic_Config_SecurityConfig_PacketSignaturePolicy policy =
-        meshtastic_Config_SecurityConfig_PacketSignaturePolicy_PACKET_SIGNATURE_POLICY_BALANCED;
+    // Deliberately NOT initialized in-class as this eats flash space.
+    meshtastic_Config_SecurityConfig_PacketSignaturePolicy policy;
     meshtastic_MeshPacket wire = meshtastic_MeshPacket_init_zero;
     meshtastic_MeshPacket authenticated = meshtastic_MeshPacket_init_zero;
 };
@@ -161,6 +161,8 @@ Router::Router() : concurrency::OSThread("Router"), fromRadioQueue(MAX_RX_FROMRA
     cryptLock = new concurrency::Lock();
     if (!routingAuthCacheLock)
         routingAuthCacheLock = new concurrency::Lock();
+    // Runtime default for the auth-cache snapshot policy. Keep it here, saves flash.
+    routingAuthCache.policy = meshtastic_Config_SecurityConfig_PacketSignaturePolicy_PACKET_SIGNATURE_POLICY_BALANCED;
 }
 
 bool Router::shouldDecrementHopLimit(const meshtastic_MeshPacket *p)
@@ -327,7 +329,7 @@ ErrorCode Router::sendLocal(meshtastic_MeshPacket *p, RxSource src)
         printPacket("Enqueued local", p);
         // Preserve the trusted origin explicitly. Queueing used to erase src and make a local
         // phone/module packet indistinguishable from remote already-decoded ingress.
-        handleReceived(p, src);
+        deliverLocal(p, src);
         return ERRNO_SHOULD_RELEASE;
     } else if (!iface) {
         // We must be sending to remote nodes also, fail if no interface found
@@ -336,9 +338,10 @@ ErrorCode Router::sendLocal(meshtastic_MeshPacket *p, RxSource src)
         return ERRNO_NO_INTERFACES;
     } else {
         // If we are sending a broadcast, we also treat it as if we just received it ourself
-        // this allows local apps (and PCs) to see broadcasts sourced locally
+        // this allows local apps (and PCs) to see broadcasts sourced locally. Only the loopback
+        // handleReceived is deferred when nested; send(p) below still transmits immediately.
         if (isBroadcast(p->to)) {
-            handleReceived(p, src);
+            deliverLocal(p, src);
         }
 
         // don't override if a channel was requested and no need to set it when PKI is enforced
@@ -705,7 +708,7 @@ RoutingAuthVerdict passesRoutingAuthGate(meshtastic_MeshPacket *p)
 #if !(MESHTASTIC_EXCLUDE_PKI) && !(MESHTASTIC_EXCLUDE_XEDDSA)
         concurrency::LockGuard g(cryptLock);
         if (!checkXeddsaReceivePolicy(&authCandidate)) {
-            LOG_WARN("Already-decoded packet rejected by signature policy before routing state update");
+            LOG_WARN("Already-decoded packet rejected by signature policy");
             return RoutingAuthVerdict::REJECT;
         }
 #endif
@@ -716,15 +719,15 @@ RoutingAuthVerdict passesRoutingAuthGate(meshtastic_MeshPacket *p)
     }
     const DecodeState state = perhapsDecode(&authCandidate);
     if (state == DecodeState::DECODE_POLICY_REJECT) {
-        LOG_WARN("Packet rejected by signature policy before routing state update");
+        LOG_WARN("Packet rejected by signature policy");
         return RoutingAuthVerdict::REJECT;
     }
     if (state == DecodeState::DECODE_FATAL) {
-        LOG_WARN("Fatal decode error before routing state update");
+        LOG_WARN("Fatal decode error, dropping packet");
         return RoutingAuthVerdict::REJECT;
     }
     if (state == DecodeState::DECODE_FAILURE) {
-        LOG_WARN("Decryptable packet failed decoding/authentication before routing state update");
+        LOG_WARN("Decryptable packet failed decoding, dropping packet");
         return RoutingAuthVerdict::REJECT;
     }
 
@@ -815,13 +818,13 @@ DecodeState perhapsDecode(meshtastic_MeshPacket *p)
         (ourNode = nodeDB->getMeshNode(p->to)) != nullptr && ourNode->public_key.size > 0) {
         pkiAttempted = true;
         LOG_DEBUG("Attempt PKI decryption");
-        // Resolve the sender's public key only for actual PKI-decrypt candidates: prefer NodeDB
-        // (hot store or warm tier), else a not-yet-committed key held during an in-progress
-        // key-verification handshake. On a full NodeDB miss, copyPublicKey() falls through to a
-        // linear scan of TrafficManagement's large NodeInfo cache, so it must not run for every
-        // encrypted channel packet from an unknown sender - only for packets we might decrypt.
+        // Resolve the sender's key only for actual PKI-decrypt candidates, not every encrypted channel
+        // packet: copyPublicKeyForDecrypt() can fall through to a linear scan of TrafficManagement's large
+        // NodeInfo cache. It returns authoritative keys (hot/warm), or a cold-tier cache key only when it is
+        // signer-proven - an unverified TOFU cache key must not back authenticated (pki_encrypted, p->from)
+        // DM attribution.
         meshtastic_NodeInfoLite_public_key_t remotePublic = {0, {0}};
-        bool haveRemoteKey = nodeDB->copyPublicKey(p->from, remotePublic);
+        bool haveRemoteKey = nodeDB->copyPublicKeyForDecrypt(p->from, remotePublic);
         // A pending key is an unverified identity claim supplied by whoever opened the handshake, so it is
         // accepted only for the exchange itself (checked after decode). perhapsEncode applies the same rule.
         bool havePendingKey = false;
@@ -1199,19 +1202,94 @@ NodeNum Router::getNodeNum()
     return nodeDB->getNodeNum();
 }
 
+bool Router::enqueueDeferredLocal(meshtastic_MeshPacket *p, RxSource src)
+{
+    if (deferredLocalCount >= deferredLocalCapacity)
+        return false;
+    uint8_t tail = (deferredLocalHead + deferredLocalCount) % deferredLocalCapacity;
+    deferredLocalQueue[tail].p = p;
+    deferredLocalQueue[tail].src = src;
+    deferredLocalCount++;
+    return true;
+}
+
+bool Router::dequeueDeferredLocal(DeferredLocal &out)
+{
+    if (deferredLocalCount == 0)
+        return false;
+    out = deferredLocalQueue[deferredLocalHead];
+    deferredLocalHead = (deferredLocalHead + 1) % deferredLocalCapacity;
+    deferredLocalCount--;
+    return true;
+}
+
+void Router::deliverLocal(meshtastic_MeshPacket *p, RxSource src)
+{
+    // Top level: handle synchronously, exactly as before the depth guard existed.
+    if (handleDepth == 0) {
+        handleReceived(p, src);
+        return;
+    }
+
+    // Nested: a module sent this from inside callModules(). Defer a copy so the outermost
+    // handleReceived() drains it once the current dispatch unwinds, instead of stacking another
+    // handleReceived() frame on top of the module handler (nRF52 stack overflow on config save).
+    meshtastic_MeshPacket *copy = packetPool.allocCopy(*p);
+    if (copy && enqueueDeferredLocal(copy, src))
+        return;
+
+    // Pool exhausted or queue full: drop the deferral. Leak-free and degraded but safe - the
+    // packet still followed its normal non-loopback path (SHOULD_RELEASE, or the TX path for a
+    // broadcast). Mirrors sendToPhone()'s degrade-on-exhaustion behavior.
+    if (copy)
+        packetPool.release(copy);
+    LOG_WARN("Deferred local queue full/alloc failed, dropping loopback of 0x%08x", p->id);
+#ifdef PIO_UNIT_TESTING
+    deferredLocalDropped++;
+#endif
+}
+
 /**
  * Handle any packet that is received by an interface on this node.
  * Note: some packets may merely being passed through this node and will be forwarded elsewhere.
  */
 void Router::handleReceived(meshtastic_MeshPacket *p, RxSource src)
 {
+    handleDepth++;
+#ifdef PIO_UNIT_TESTING
+    if (handleDepth > maxHandleDepthObserved)
+        maxHandleDepthObserved = handleDepth;
+#endif
+
+    dispatchReceived(p, src);
+
+    // Only the outermost frame drains. Deferred packets were produced by modules sending from
+    // inside dispatchReceived()'s callModules(); process them here, after the triggering frame has
+    // unwound, so a second handleReceived() never sits on top of a module handler. handleDepth
+    // stays >= 1 through the drain, so a drained packet whose own modules send more loopback
+    // packets enqueues them for this same loop rather than recursing: the stack stays flat and
+    // processing is breadth-first.
+    if (handleDepth == 1) {
+        DeferredLocal d;
+        while (dequeueDeferredLocal(d)) {
+            dispatchReceived(d.p, d.src);
+            packetPool.release(d.p);
+        }
+    }
+
+    handleDepth--;
+}
+
+void Router::dispatchReceived(meshtastic_MeshPacket *p, RxSource src)
+{
     bool skipHandle = false;
 
     // Store a copy of the encrypted packet for MQTT.
-    // Local, not a class member: handleReceived re-enters itself when a module
-    // reply broadcast goes through MeshService::sendToMesh -> Router::sendLocal,
-    // and a member would be silently overwritten without release on the inner
-    // call. Each invocation now owns its own copy (issue #9632, #10101, #8729).
+    // Kept as a local (not a class member) so each dispatch owns its own copy. A shared member was
+    // historically overwritten without release when a module's reply re-entered this path through
+    // MeshService::sendToMesh -> Router::sendLocal (issues #9632, #10101, #8729). Nested local
+    // sends are now deferred rather than synchronously re-entrant (see the drain in
+    // handleReceived()), so this no longer strictly needs to be a local, but it is kept per-call.
     DEBUG_HEAP_BEFORE;
     meshtastic_MeshPacket *p_encrypted = packetPool.allocCopy(*p);
     DEBUG_HEAP_AFTER("Router::handleReceived", p_encrypted);
