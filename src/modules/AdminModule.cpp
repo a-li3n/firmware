@@ -714,6 +714,9 @@ bool AdminModule::handleReceivedProtobuf(const meshtastic_MeshPacket &mp, meshta
     return handled;
 }
 
+// Declared here, defined below near messageIsRequest: maps a getter request to its response variant.
+static pb_size_t adminResponseForRequest(pb_size_t requestVariant);
+
 void AdminModule::handleViaModuleApi(const meshtastic_MeshPacket &mp, meshtastic_AdminMessage *r)
 {
     meshtastic_AdminMessage res = meshtastic_AdminMessage_init_default;
@@ -724,6 +727,20 @@ void AdminModule::handleViaModuleApi(const meshtastic_MeshPacket &mp, meshtastic
         myReply = allocDataProtobuf(res);
     } else if (mp.decoded.want_response) {
         LOG_DEBUG("Module API didn't respond to admin msg. req.variant=%d", r->which_payload_variant);
+        // No module owns this getter (or its handler was compiled out, e.g. RTTTL
+        // on native, or canned messages on headless builds where the module is
+        // never constructed). A plain routing ack leaves the client waiting for
+        // an admin payload that never arrives - the Python CLI's --export-config
+        // waits on these responses with no timeout. Answer with a default
+        // (empty) response of the matching variant so the request/response
+        // contract holds on every build.
+        const pb_size_t responseVariant = adminResponseForRequest(r->which_payload_variant);
+        if (responseVariant) {
+            meshtastic_AdminMessage emptyResponse = meshtastic_AdminMessage_init_default;
+            emptyResponse.which_payload_variant = responseVariant;
+            setPassKey(&emptyResponse);
+            myReply = allocDataProtobuf(emptyResponse);
+        }
     } else if (handleResult != AdminMessageHandleResult::HANDLED) {
         // Probably a message sent by us or sent to our local node.  FIXME, we should avoid scanning these messages
         LOG_DEBUG("Module API didn't handle admin msg %d", r->which_payload_variant);

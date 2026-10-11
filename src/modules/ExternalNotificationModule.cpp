@@ -598,6 +598,18 @@ AdminMessageHandleResult ExternalNotificationModule::handleAdminMessageForModule
         this->handleSetRingtone(request->set_canned_message_module_messages);
         result = AdminMessageHandleResult::HANDLED;
         break;
+#else
+    case meshtastic_AdminMessage_get_ringtone_request_tag:
+        // RTTTL playback is excluded on this platform (no PWM), but the module
+        // is still constructed and clients still send the getter - the Python
+        // CLI's --export-config blocks indefinitely with no timeout when the
+        // request is only acked at the routing layer. Answer with an empty
+        // ringtone so getter semantics stay total on every build.
+        LOG_INFO("Client getting ringtone (RTTTL excluded, replying empty)");
+        response->which_payload_variant = meshtastic_AdminMessage_get_ringtone_response_tag;
+        response->get_ringtone_response[0] = '\0';
+        result = AdminMessageHandleResult::HANDLED_WITH_RESPONSE;
+        break;
 #endif
 
     default:
